@@ -31,9 +31,19 @@
 *.out
 *.app
 
-# Test outputs
-*.txt
+# Project build and run outputs
+compiler
+compiler.exe
+ast.txt
+out.txt
 
 # OS Junk
 .DS_Store
 Thumbs.db
+
+# Frontend artifacts (compiler-web)
+compiler-web/node_modules/
+compiler-web/dist/
+compiler-web/dist-ssr/
+compiler-web/.vite/
+compiler-web/*.local
