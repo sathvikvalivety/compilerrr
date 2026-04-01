@@ -31,7 +31,10 @@ typedef struct {
     TokenType type;
     char lexeme[64];
     int value; // meaningful if TOK_NUM
+    int position; // 1-indexed
 } Token;
+
+const char* token_to_string(TokenType type);
 
 #define MAX_TOKENS 1024
 extern Token tokens[MAX_TOKENS];

@@ -20,7 +20,12 @@ void match(TokenType expected) {
     if (tokens[token_idx].type == expected) {
         token_idx++;
     } else {
-        printf("Syntax Error: Expected token %d but found %d\n", expected, tokens[token_idx].type);
+        if (expected == TOK_RPAREN && tokens[token_idx].type == TOK_EOF) {
+            printf("Syntax Error: Expected closing ')' but reached end of input\n");
+        } else {
+            printf("Syntax Error: Expected %s but found %s at position %d\n", 
+                   token_to_string(expected), token_to_string(tokens[token_idx].type), tokens[token_idx].position);
+        }
         exit(1);
     }
 }
@@ -29,7 +34,12 @@ ASTNode* parse() {
     token_idx = 0;
     ASTNode* root = parse_or();
     if (tokens[token_idx].type != TOK_EOF) {
-        printf("Syntax Error: Extra tokens at end of input.\n");
+        if (tokens[token_idx].type == TOK_RPAREN) {
+            printf("Syntax Error: Unexpected ')' at position %d\n", tokens[token_idx].position);
+        } else {
+            printf("Syntax Error: Unexpected token '%s' after end of expression at position %d\n", 
+                   token_to_string(tokens[token_idx].type), tokens[token_idx].position);
+        }
         exit(1);
     }
     printf("AST constructed successfully.\n");
@@ -73,6 +83,10 @@ ASTNode* parse_relational() {
         
         ASTNode* node = create_node(AST_RELOP);
         node->op = type;
+        
+        // Guard against consecutive relational operators like "a > > b"
+        // Wait, the primary will catch `>` in `parse_primary`.
+        
         token_idx++;
         
         node->left = left;
@@ -86,6 +100,7 @@ ASTNode* parse_relational() {
         printf("Parsing rule: expr -> expr %s term\n", op_str);
         return node;
     }
+    // Return expression transparently
     return left;
 }
 
@@ -139,12 +154,25 @@ ASTNode* parse_primary() {
         return node;
     } else if (t.type == TOK_LPAREN) {
         token_idx++;
+        
+        // Guard empty parentheses ()
+        if (tokens[token_idx].type == TOK_RPAREN) {
+            printf("Syntax Error: Empty parentheses at position %d\n", t.position);
+            exit(1);
+        }
+        
         ASTNode* node = parse_or();
         match(TOK_RPAREN);
         printf("Parsing rule: primary -> ( expr )\n");
         return node;
     } else {
-        printf("Syntax Error: Unexpected token %d in parsing primary.\n", t.type);
+        if (t.type == TOK_EOF) {
+            // Unlikely to hit unless user entered nothing (and caught in main)
+            printf("Syntax Error: Unexpected end of input, expected operand.\n");
+        } else {
+            // E.g. a + > b
+            printf("Syntax Error: Expected operand but found '%s' at position %d\n", token_to_string(t.type), t.position);
+        }
         exit(1);
     }
     return NULL;

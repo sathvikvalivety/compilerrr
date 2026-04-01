@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include <ctype.h>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -8,6 +9,18 @@ int main(int argc, char** argv) {
     }
 
     const char* source = argv[1];
+    int is_empty = 1;
+    for (int i = 0; source[i] != '\0'; i++) {
+        if (!isspace(source[i])) {
+            is_empty = 0;
+            break;
+        }
+    }
+    if (is_empty) {
+        printf("Syntax Error: Empty input provided\n");
+        return 1;
+    }
+    
     printf("Compiling source: %s\n\n", source);
 
     // Phase 1: Lexical Analysis
