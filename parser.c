@@ -178,12 +178,40 @@ ASTNode* parse_primary() {
     return NULL;
 }
 
+void print_ast_internal(ASTNode* node, const char* prefix, int is_left, int has_sibling) {
+    if (!node) return;
+
+    printf("%s", prefix);
+    printf(is_left ? (has_sibling ? "|-- " : "\\-- ") : "\\-- ");
+
+    if (node->node_type == AST_NUM) printf("%d\n", node->value);
+    else if (node->node_type == AST_ID) printf("%s\n", node->name);
+    else if (node->node_type == AST_BINOP || node->node_type == AST_RELOP) {
+        if (node->op == TOK_PLUS) printf("+\n");
+        else if (node->op == TOK_MINUS) printf("-\n");
+        else if (node->op == TOK_MUL) printf("*\n");
+        else if (node->op == TOK_DIV) printf("/\n");
+        else if (node->op == TOK_GT) printf(">\n");
+        else if (node->op == TOK_LT) printf("<\n");
+        else if (node->op == TOK_GE) printf(">=\n");
+        else if (node->op == TOK_LE) printf("<=\n");
+        else if (node->op == TOK_EQ) printf("==\n");
+        else if (node->op == TOK_AND) printf("&&\n");
+        else if (node->op == TOK_OR) printf("||\n");
+    }
+
+    char new_prefix[512];
+    sprintf(new_prefix, "%s%s", prefix, (is_left && has_sibling) ? "|   " : "    ");
+
+    if (node->left || node->right) {
+        if (node->left) print_ast_internal(node->left, new_prefix, 1, node->right != NULL);
+        if (node->right) print_ast_internal(node->right, new_prefix, 0, 0);
+    }
+}
+
 void print_ast(ASTNode* root, int space) {
+    (void)space;
     if (!root) return;
-    space += 5;
-    print_ast(root->right, space);
-    printf("\n");
-    for (int i = 5; i < space; i++) printf(" ");
     
     if (root->node_type == AST_NUM) printf("%d\n", root->value);
     else if (root->node_type == AST_ID) printf("%s\n", root->name);
@@ -200,6 +228,7 @@ void print_ast(ASTNode* root, int space) {
         else if (root->op == TOK_AND) printf("&&\n");
         else if (root->op == TOK_OR) printf("||\n");
     }
-    
-    print_ast(root->left, space);
+
+    if (root->left) print_ast_internal(root->left, "", 1, root->right != NULL);
+    if (root->right) print_ast_internal(root->right, "", 0, 0);
 }
