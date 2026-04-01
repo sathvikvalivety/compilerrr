@@ -20,6 +20,8 @@ typedef enum {
     TOK_GE,     // >=
     TOK_LE,     // <=
     TOK_EQ,     // ==
+    TOK_AND,    // &&
+    TOK_OR,     // ||
     TOK_LPAREN, // (
     TOK_RPAREN, // )
     TOK_EOF
@@ -77,6 +79,7 @@ typedef struct ASTNode {
 } ASTNode;
 
 ASTNode* parse();
+void print_ast(ASTNode* root, int space);
 
 // --- Phase 3: Semantic Analysis ---
 
@@ -97,6 +100,7 @@ typedef struct {
     char arg1[64];
     char arg2[64];
     char result[64]; // or goto label
+    char comment[64];
 } TACInstr;
 
 #define MAX_TAC 1024
@@ -104,6 +108,7 @@ extern TACInstr tac_stream[MAX_TAC];
 extern int tac_count;
 
 void generate_tac(ASTNode* node);
+void add_tac_comment(TACOp op, const char* arg1, const char* arg2, const char* result, const char* comment);
 void add_tac(TACOp op, const char* arg1, const char* arg2, const char* result);
 char* new_temp();
 char* new_label();

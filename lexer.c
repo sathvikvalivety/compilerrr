@@ -67,6 +67,20 @@ void lex(const char* source) {
                         exit(1);
                     }
                     break;
+                case '&':
+                    if (source[i+1] == '&') { t.type = TOK_AND; strcpy(t.lexeme, "&&"); i+=2; }
+                    else {
+                        printf("Syntax Error: Expected &&\n");
+                        exit(1);
+                    }
+                    break;
+                case '|':
+                    if (source[i+1] == '|') { t.type = TOK_OR; strcpy(t.lexeme, "||"); i+=2; }
+                    else {
+                        printf("Syntax Error: Expected ||\n");
+                        exit(1);
+                    }
+                    break;
                 default:
                     printf("Syntax Error: Unknown character '%c'\n", source[i]);
                     exit(1);

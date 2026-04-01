@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include <ctype.h>
 
 TACInstr tac_stream[MAX_TAC];
 int tac_count = 0;
@@ -18,21 +19,32 @@ char* new_label() {
     return l;
 }
 
-void add_tac(TACOp op, const char* arg1, const char* arg2, const char* result) {
+void add_tac_comment(TACOp op, const char* arg1, const char* arg2, const char* result, const char* comment) {
     TACInstr inst;
     inst.op = op;
     if (arg1) strcpy(inst.arg1, arg1); else inst.arg1[0] = '\0';
     if (arg2) strcpy(inst.arg2, arg2); else inst.arg2[0] = '\0';
     if (result) strcpy(inst.result, result); else inst.result[0] = '\0';
+    if (comment) strcpy(inst.comment, comment); else inst.comment[0] = '\0';
     tac_stream[tac_count++] = inst;
+}
+
+void add_tac(TACOp op, const char* arg1, const char* arg2, const char* result) {
+    add_tac_comment(op, arg1, arg2, result, NULL);
+}
+
+int is_numeric_str(const char* str) {
+    if (!str || !str[0]) return 0;
+    for (int i = 0; str[i]; i++) {
+        if (!isdigit(str[i]) && !(i == 0 && str[i] == '-')) return 0;
+    }
+    return 1;
 }
 
 char* generate_tac_expr(ASTNode* node) {
     if (!node) return NULL;
 
-    if (node->node_type == AST_ID) {
-        return node->name;
-    }
+    if (node->node_type == AST_ID) return node->name;
 
     if (node->node_type == AST_NUM) {
         char* v = (char*)malloc(16);
@@ -40,10 +52,25 @@ char* generate_tac_expr(ASTNode* node) {
         return v;
     }
 
-    if (node->node_type == AST_BINOP) {
+    if (node->node_type == AST_BINOP && node->op != TOK_AND && node->op != TOK_OR) {
         char* tleft = generate_tac_expr(node->left);
         char* tright = generate_tac_expr(node->right);
         
+        // Constant Folding logic
+        if (is_numeric_str(tleft) && is_numeric_str(tright)) {
+            int v1 = atoi(tleft);
+            int v2 = atoi(tright);
+            int res = 0;
+            if (node->op == TOK_PLUS) res = v1 + v2;
+            else if (node->op == TOK_MINUS) res = v1 - v2;
+            else if (node->op == TOK_MUL) res = v1 * v2;
+            else if (node->op == TOK_DIV) res = (v2 != 0) ? v1 / v2 : 0;
+            
+            char* folded = (char*)malloc(16);
+            sprintf(folded, "%d", res);
+            return folded;
+        }
+
         TACOp op;
         switch (node->op) {
             case TOK_PLUS:  op = TAC_ADD; break;
@@ -56,6 +83,28 @@ char* generate_tac_expr(ASTNode* node) {
         char* res = new_temp();
         add_tac(op, tleft, tright, res);
         return res;
+    }
+    
+    return NULL;
+}
+
+void generate_bool_tac(ASTNode* node, const char* label_true, const char* label_false) {
+    if (!node) return;
+
+    if (node->node_type == AST_BINOP && node->op == TOK_OR) {
+        char* l_next = new_label();
+        generate_bool_tac(node->left, label_true, l_next);
+        add_tac_comment(TAC_LABEL, NULL, NULL, l_next, "OR short-circuit check");
+        generate_bool_tac(node->right, label_true, label_false);
+        return;
+    }
+
+    if (node->node_type == AST_BINOP && node->op == TOK_AND) {
+        char* l_next = new_label();
+        generate_bool_tac(node->left, l_next, label_false);
+        add_tac_comment(TAC_LABEL, NULL, NULL, l_next, "AND short-circuit progression");
+        generate_bool_tac(node->right, label_true, label_false);
+        return;
     }
 
     if (node->node_type == AST_RELOP) {
@@ -72,31 +121,31 @@ char* generate_tac_expr(ASTNode* node) {
             default: op = TAC_GT;
         }
         
-        char* label_true = new_label();
-        char* label_false = new_label();
-        
-        // Emitting `if tleft op tright goto label_true`
         add_tac(op, tleft, tright, label_true);
-        // Emitting `goto label_false`
         add_tac(TAC_GOTO, NULL, NULL, label_false);
-
-        // Normally backpatching sets these up or returns them for upper layers.
-        // For simple nested output, we print the labels right here to demonstrate control flow.
-        add_tac(TAC_LABEL, NULL, NULL, label_true);
-        // ... Code for true block would go here
-        add_tac(TAC_LABEL, NULL, NULL, label_false);
-        // ... Code for false block
-        
-        // Relational operator doesn't return a value register in this simple scheme, 
-        // it controls layout, or we can just return a boolean register. Let's return the left side 
-        // just to not crash, though in reality it resolves to branches.
-        return NULL;
+        return;
     }
     
-    return NULL;
+    char* val = generate_tac_expr(node);
+    add_tac(TAC_GT, val, "0", label_true); 
+    add_tac(TAC_GOTO, NULL, NULL, label_false);
 }
 
 void generate_tac(ASTNode* node) {
     if (!node) return;
-    generate_tac_expr(node);
+    
+    if (node->expr_type == TYPE_BOOL || 
+       (node->node_type == AST_BINOP && (node->op == TOK_AND || node->op == TOK_OR)) || 
+       node->node_type == AST_RELOP) {
+       
+        char* label_true = new_label();
+        char* label_false = new_label();
+        
+        generate_bool_tac(node, label_true, label_false);
+        
+        add_tac_comment(TAC_LABEL, NULL, NULL, label_true, "TRUE branch");
+        add_tac_comment(TAC_LABEL, NULL, NULL, label_false, "FALSE branch");
+    } else {
+        generate_tac_expr(node);
+    }
 }

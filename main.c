@@ -24,12 +24,18 @@ int main(int argc, char** argv) {
     // Phase 2: Syntax Analysis
     printf("\n--- Phase 2: Syntax Analysis ---\n");
     ASTNode* ast_root = parse();
-    printf("AST Generated successfully.\n");
+    printf("\n--- AST ---\n");
+    print_ast(ast_root, 0);
+    printf("\n");
 
     // Phase 3: Semantic Analysis
     printf("\n--- Phase 3: Semantic Analysis ---\n");
+    printf("Symbol Table:\n");
+    for (int i = 0; i < sym_count; i++) {
+        printf("  %s -> type: int\n", sym_table[i].name);
+    }
     semantic_analyze(ast_root);
-    printf("Type checking passed.\n");
+    printf("Semantic analysis passed.\n");
 
     // Phase 4: Intermediate Code Generation
     printf("\n--- Phase 4: Intermediate Code Generation (TAC) ---\n");
@@ -53,7 +59,11 @@ int main(int argc, char** argv) {
         } else if (in.op == TAC_GOTO) {
             printf("goto %s\n", in.result);
         } else if (in.op == TAC_LABEL) {
-            printf("%s:\n", in.result);
+            if (in.comment[0] != '\0') {
+                printf("%s:\t; -- %s --\n", in.result, in.comment);
+            } else {
+                printf("%s:\n", in.result);
+            }
         }
     }
 

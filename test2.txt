@@ -1,0 +1,51 @@
+Compiling source: 2 + 3 * 4 > 10
+
+--- Phase 1: Lexical Analysis ---
+Token: 1, Lexeme: 2
+Token: 2, Lexeme: +
+Token: 1, Lexeme: 3
+Token: 4, Lexeme: *
+Token: 1, Lexeme: 4
+Token: 6, Lexeme: >
+Token: 1, Lexeme: 10
+
+--- AST ---
+
+     10
+
+>
+
+               4
+
+          *
+
+               3
+
+     +
+
+          2
+
+
+--- Phase 3: Semantic Analysis ---
+Type checking passed.
+
+--- Phase 4: Intermediate Code Generation (TAC) ---
+if 14 > 10 goto L1
+goto L2
+L1:
+L2:
+
+--- Phase 5: Code Optimization ---
+Optimized TAC Stream:
+if 14 > 10 goto L1
+goto L2
+L1:
+L2:
+
+--- Final x86 Pseudo-Assembly ---
+MOV eax, 14
+CMP eax, 10
+JG L1
+JMP L2
+L1:
+L2:

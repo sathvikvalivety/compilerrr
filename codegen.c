@@ -3,11 +3,16 @@
 void generate_x86() {
     printf("\n--- Final x86 Pseudo-Assembly ---\n");
 
+    char current_reg_value[64] = "";
+
     for (int i = 0; i < tac_count; i++) {
         TACInstr in = tac_stream[i];
 
         if (in.op == TAC_ADD || in.op == TAC_SUB || in.op == TAC_MUL || in.op == TAC_DIV) {
-            printf("MOV eax, %s\n", in.arg1);
+            if (strcmp(current_reg_value, in.arg1) != 0) {
+                printf("MOV eax, %s\n", in.arg1);
+            }
+            
             if (in.op == TAC_ADD) {
                 printf("ADD eax, %s\n", in.arg2);
             } else if (in.op == TAC_SUB) {
@@ -20,12 +25,21 @@ void generate_x86() {
                 printf("IDIV ebx\n");
             }
             printf("MOV %s, eax\n", in.result);
+            strcpy(current_reg_value, in.result);
+            
         } else if (in.op == TAC_ASSIGN) {
-            printf("MOV eax, %s\n", in.arg1);
+            if (strcmp(current_reg_value, in.arg1) != 0) {
+                printf("MOV eax, %s\n", in.arg1);
+            }
             printf("MOV %s, eax\n", in.result);
+            strcpy(current_reg_value, in.result);
+            
         } else if (in.op >= TAC_GT && in.op <= TAC_EQ) {
-            printf("MOV eax, %s\n", in.arg1);
+            if (strcmp(current_reg_value, in.arg1) != 0) {
+                printf("MOV eax, %s\n", in.arg1);
+            }
             printf("CMP eax, %s\n", in.arg2);
+            strcpy(current_reg_value, ""); // Reset register assumed state due to potential jump branch issues
             
             char jump_instr[4] = "";
             if (in.op == TAC_GT) strcpy(jump_instr, "JG");
@@ -37,8 +51,14 @@ void generate_x86() {
             printf("%s %s\n", jump_instr, in.result);
         } else if (in.op == TAC_GOTO) {
             printf("JMP %s\n", in.result);
+            strcpy(current_reg_value, ""); // Reset on jump
         } else if (in.op == TAC_LABEL) {
-            printf("%s:\n", in.result);
+            if (in.comment[0] != '\0') {
+                printf("%s:\t; -- %s --\n", in.result, in.comment);
+            } else {
+                printf("%s:\n", in.result);
+            }
+            strcpy(current_reg_value, ""); // Reset on label entry
         }
     }
 }

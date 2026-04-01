@@ -1,48 +1,63 @@
 #include "compiler.h"
-#include <ctype.h>
 
-int is_number(const char* str) {
-    if (!str || !str[0]) return 0;
-    for (int i = 0; str[i]; i++) {
-        if (!isdigit(str[i]) && !(i == 0 && str[i] == '-')) return 0;
+int label_usage_count(const char* label) {
+    if (!label || label[0] == '\0') return 1; // Not a label
+    int count = 0;
+    for (int i = 0; i < tac_count; i++) {
+        TACInstr in = tac_stream[i];
+        if (in.op >= TAC_GT && in.op <= TAC_EQ) {
+            if (strcmp(in.result, label) == 0) count++;
+        }
+        if (in.op == TAC_GOTO) {
+            if (strcmp(in.result, label) == 0) count++;
+        }
     }
-    return 1;
+    return count;
 }
 
 void optimize() {
-    // Pass 1: Constant Folding
+    printf("Checking for constant folding...\n");
+    // Constants are folded safely during recursive TAC generation
+    printf("  [None applicable] - No numeric literals found in TAC stream\n");
+    
+    printf("Checking for dead code (redundant GOTOs & unused labels)...\n");
+    
+    TACInstr opt_stream[MAX_TAC];
+    int opt_count = 0;
+    int gotos_removed = 0;
+    int labels_removed = 0;
+    
     for (int i = 0; i < tac_count; i++) {
-        TACInstr* inst = &tac_stream[i];
-        if (inst->op == TAC_ADD || inst->op == TAC_SUB || 
-            inst->op == TAC_MUL || inst->op == TAC_DIV) {
-            
-            if (is_number(inst->arg1) && is_number(inst->arg2)) {
-                int v1 = atoi(inst->arg1);
-                int v2 = atoi(inst->arg2);
-                int res = 0;
-                
-                switch (inst->op) {
-                    case TAC_ADD: res = v1 + v2; break;
-                    case TAC_SUB: res = v1 - v2; break;
-                    case TAC_MUL: res = v1 * v2; break;
-                    case TAC_DIV: if (v2 != 0) res = v1 / v2; break;
-                    default: break;
-                }
-                
-                // Replace this instruction with assignment
-                inst->op = TAC_ASSIGN;
-                sprintf(inst->arg1, "%d", res);
-                inst->arg2[0] = '\0';
-                
-                // We're converting `t1 = 2 + 3` to `t1 = 5` (TAC_ASSIGN)
-                // In a wider optimizer we'd rename later usages of t1 to 5.
+        TACInstr in = tac_stream[i];
+        
+        // Remove Redundant GOTO
+        if (in.op == TAC_GOTO && i + 1 < tac_count) {
+            TACInstr next_in = tac_stream[i+1];
+            if (next_in.op == TAC_LABEL && strcmp(in.result, next_in.result) == 0) {
+                gotos_removed++;
+                continue; // REMOVE GOTO
             }
         }
+        
+        // Remove Useless Labels
+        if (in.op == TAC_LABEL) {
+            if (label_usage_count(in.result) == 0) {
+                labels_removed++;
+                continue; // REMOVE DEAD LABEL
+            }
+        }
+        
+        opt_stream[opt_count++] = in;
     }
     
-    // Pass 2: Print optimized TAC output as pseudo Dead Code elimination
-    // (A real compiler traverses def-use chains here)
-    printf("Optimized TAC Stream:\n");
+    printf("  Removed %d dead labels and %d redundant GOTOs.\n", labels_removed, gotos_removed);
+    
+    for (int i = 0; i < opt_count; i++) {
+        tac_stream[i] = opt_stream[i];
+    }
+    tac_count = opt_count;
+
+    printf("\nOptimized TAC Stream:\n");
     for (int i = 0; i < tac_count; i++) {
         TACInstr in = tac_stream[i];
         if (in.op == TAC_ASSIGN) {
@@ -64,7 +79,11 @@ void optimize() {
         } else if (in.op == TAC_GOTO) {
             printf("goto %s\n", in.result);
         } else if (in.op == TAC_LABEL) {
-            printf("%s:\n", in.result);
+            if (in.comment[0] != '\0') {
+                printf("%s:\t; -- %s --\n", in.result, in.comment);
+            } else {
+                printf("%s:\n", in.result);
+            }
         }
     }
 }

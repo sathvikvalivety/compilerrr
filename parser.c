@@ -1,7 +1,8 @@
 #include "compiler.h"
 
-// Prototypes for recursive descent
-ASTNode* parse_expr();
+ASTNode* parse_or();
+ASTNode* parse_and();
+ASTNode* parse_relational();
 ASTNode* parse_additive();
 ASTNode* parse_multiplicative();
 ASTNode* parse_primary();
@@ -26,15 +27,44 @@ void match(TokenType expected) {
 
 ASTNode* parse() {
     token_idx = 0;
-    ASTNode* root = parse_expr();
+    ASTNode* root = parse_or();
     if (tokens[token_idx].type != TOK_EOF) {
         printf("Syntax Error: Extra tokens at end of input.\n");
         exit(1);
     }
+    printf("AST constructed successfully.\n");
     return root;
 }
 
-ASTNode* parse_expr() {
+ASTNode* parse_or() {
+    ASTNode* left = parse_and();
+    while (tokens[token_idx].type == TOK_OR) {
+        ASTNode* node = create_node(AST_BINOP); 
+        node->op = TOK_OR;
+        token_idx++;
+        node->left = left;
+        node->right = parse_and();
+        printf("Parsing rule: expr -> expr || term\n");
+        left = node;
+    }
+    return left;
+}
+
+ASTNode* parse_and() {
+    ASTNode* left = parse_relational();
+    while (tokens[token_idx].type == TOK_AND) {
+        ASTNode* node = create_node(AST_BINOP);
+        node->op = TOK_AND;
+        token_idx++;
+        node->left = left;
+        node->right = parse_relational();
+        printf("Parsing rule: expr -> expr && term\n");
+        left = node;
+    }
+    return left;
+}
+
+ASTNode* parse_relational() {
     ASTNode* left = parse_additive();
     
     TokenType type = tokens[token_idx].type;
@@ -43,13 +73,20 @@ ASTNode* parse_expr() {
         
         ASTNode* node = create_node(AST_RELOP);
         node->op = type;
-        token_idx++; // consume relop
+        token_idx++;
         
         node->left = left;
         node->right = parse_additive();
+        char op_str[3] = "";
+        if (node->op == TOK_GT) strcpy(op_str, ">");
+        else if (node->op == TOK_LT) strcpy(op_str, "<");
+        else if (node->op == TOK_GE) strcpy(op_str, ">=");
+        else if (node->op == TOK_LE) strcpy(op_str, "<=");
+        else if (node->op == TOK_EQ) strcpy(op_str, "==");
+        printf("Parsing rule: expr -> expr %s term\n", op_str);
         return node;
     }
-    return left; // No relational operator
+    return left;
 }
 
 ASTNode* parse_additive() {
@@ -62,7 +99,9 @@ ASTNode* parse_additive() {
         
         node->left = left;
         node->right = parse_multiplicative();
-        left = node; // Left-associative
+        char op_char = (node->op == TOK_PLUS) ? '+' : '-';
+        printf("Parsing rule: term -> term %c factor\n", op_char);
+        left = node;
     }
     return left;
 }
@@ -77,7 +116,9 @@ ASTNode* parse_multiplicative() {
         
         node->left = left;
         node->right = parse_primary();
-        left = node; // Left-associative
+        char op_char = (node->op == TOK_MUL) ? '*' : '/';
+        printf("Parsing rule: factor -> factor %c primary\n", op_char);
+        left = node;
     }
     return left;
 }
@@ -88,20 +129,49 @@ ASTNode* parse_primary() {
         ASTNode* node = create_node(AST_ID);
         strcpy(node->name, t.lexeme);
         token_idx++;
+        printf("Parsing rule: primary -> ID (%s)\n", t.lexeme);
         return node;
     } else if (t.type == TOK_NUM) {
         ASTNode* node = create_node(AST_NUM);
         node->value = t.value;
         token_idx++;
+        printf("Parsing rule: primary -> NUM (%d)\n", t.value);
         return node;
     } else if (t.type == TOK_LPAREN) {
-        token_idx++; // '('
-        ASTNode* node = parse_expr();
-        match(TOK_RPAREN); // ')'
+        token_idx++;
+        ASTNode* node = parse_or();
+        match(TOK_RPAREN);
+        printf("Parsing rule: primary -> ( expr )\n");
         return node;
     } else {
         printf("Syntax Error: Unexpected token %d in parsing primary.\n", t.type);
         exit(1);
     }
     return NULL;
+}
+
+void print_ast(ASTNode* root, int space) {
+    if (!root) return;
+    space += 5;
+    print_ast(root->right, space);
+    printf("\n");
+    for (int i = 5; i < space; i++) printf(" ");
+    
+    if (root->node_type == AST_NUM) printf("%d\n", root->value);
+    else if (root->node_type == AST_ID) printf("%s\n", root->name);
+    else if (root->node_type == AST_BINOP || root->node_type == AST_RELOP) {
+        if (root->op == TOK_PLUS) printf("+\n");
+        else if (root->op == TOK_MINUS) printf("-\n");
+        else if (root->op == TOK_MUL) printf("*\n");
+        else if (root->op == TOK_DIV) printf("/\n");
+        else if (root->op == TOK_GT) printf(">\n");
+        else if (root->op == TOK_LT) printf("<\n");
+        else if (root->op == TOK_GE) printf(">=\n");
+        else if (root->op == TOK_LE) printf("<=\n");
+        else if (root->op == TOK_EQ) printf("==\n");
+        else if (root->op == TOK_AND) printf("&&\n");
+        else if (root->op == TOK_OR) printf("||\n");
+    }
+    
+    print_ast(root->left, space);
 }

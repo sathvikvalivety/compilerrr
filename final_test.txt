@@ -1,0 +1,119 @@
+Compiling source: (a+b>c)&&(d*e<f)
+
+--- Phase 1: Lexical Analysis ---
+Token: 13, Lexeme: (
+Token: 0, Lexeme: a
+Token: 2, Lexeme: +
+Token: 0, Lexeme: b
+Token: 6, Lexeme: >
+Token: 0, Lexeme: c
+Token: 14, Lexeme: )
+Token: 11, Lexeme: &&
+Token: 13, Lexeme: (
+Token: 0, Lexeme: d
+Token: 4, Lexeme: *
+Token: 0, Lexeme: e
+Token: 7, Lexeme: <
+Token: 0, Lexeme: f
+Token: 14, Lexeme: )
+
+--- Phase 2: Syntax Analysis ---
+Parsing rule: primary -> ID (a)
+Parsing rule: primary -> ID (b)
+Parsing rule: term -> term +/- factor
+Parsing rule: primary -> ID (c)
+Parsing rule: expr -> expr RELOP term
+Parsing rule: primary -> ( expr )
+Parsing rule: primary -> ID (d)
+Parsing rule: primary -> ID (e)
+Parsing rule: factor -> factor */div primary
+Parsing rule: primary -> ID (f)
+Parsing rule: expr -> expr RELOP term
+Parsing rule: primary -> ( expr )
+Parsing rule: expr -> expr && term
+AST constructed successfully.
+
+--- AST ---
+
+          f
+
+     <
+
+               e
+
+          *
+
+               d
+
+&&
+
+          c
+
+     >
+
+               b
+
+          +
+
+               a
+
+
+--- Phase 3: Semantic Analysis ---
+Symbol Table:
+  a -> type: int
+  b -> type: int
+  c -> type: int
+  d -> type: int
+  e -> type: int
+  f -> type: int
+Type Check: BINOP (arithmetic) -> int * int = int [OK]
+Type Check: RELOP -> int <=> int = bool [OK]
+Type Check: BINOP (arithmetic) -> int * int = int [OK]
+Type Check: RELOP -> int <=> int = bool [OK]
+Type Check: BINOP (logical) -> bool * bool = bool [OK]
+Semantic analysis passed.
+
+--- Phase 4: Intermediate Code Generation (TAC) ---
+t1 = a + b
+if t1 > c goto L3
+goto L2
+L3:	; -- AND short-circuit progression --
+t2 = d * e
+if t2 < f goto L1
+goto L2
+L1:	; -- TRUE branch --
+L2:	; -- FALSE branch --
+
+--- Phase 5: Code Optimization ---
+Checking for constant folding...
+  [None applicable] - No numeric literals found in TAC stream
+Checking for dead code (redundant GOTOs & unused labels)...
+  Removed 0 dead labels and 0 redundant GOTOs.
+
+Optimized TAC Stream:
+t1 = a + b
+if t1 > c goto L3
+goto L2
+L3:	; -- AND short-circuit progression --
+t2 = d * e
+if t2 < f goto L1
+goto L2
+L1:	; -- TRUE branch --
+L2:	; -- FALSE branch --
+
+--- Final x86 Pseudo-Assembly ---
+MOV eax, a
+ADD eax, b
+MOV t1, eax
+CMP eax, c
+JG L3
+JMP L2
+L3:	; -- AND short-circuit progression --
+MOV eax, d
+IMUL eax, e
+MOV t2, eax
+CMP eax, f
+JL L1
+JMP L2
+L1:	; -- TRUE branch --
+L2:	; -- FALSE branch --
